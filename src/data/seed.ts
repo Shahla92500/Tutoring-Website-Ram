@@ -1,0 +1,52 @@
+import type { DB } from "../types";
+import { uid } from "../lib/id";
+
+export function createSeedData(): DB {
+  return {
+    users: [
+      { id: "u1", name: "Admin User", email: "admin@site.com", password: "admin123", role: "admin" },
+      { id: "u2", name: "Tutor User", email: "tutor@site.com", password: "tutor123", role: "tutor" },
+      { id: "u3", name: "Student User", email: "student@site.com", password: "student123", role: "student" }
+    ],
+    currentUserId: null,
+    reviews: [
+      { id: uid(), name: "L.M.", rating: 5, text: "Clear explanations and strong structure." },
+      { id: uid(), name: "A.K.", rating: 5, text: "Helped me improve quickly before exams." }
+    ],
+    faq: [
+      {
+        id: uid(),
+        question: "How are sessions structured?",
+        answer: "Sessions include concept review, guided practice, and action points for the next week."
+      },
+      {
+        id: uid(),
+        question: "Do you support exam preparation?",
+        answer: "Yes. IB/AP/SAT/A-Levels tracks are available with timed strategy training."
+      }
+    ],
+    courses: [
+      {
+        id: uid(),
+        title: "Calculus I",
+        category: "University Courses",
+        description: "Limits, derivatives, optimization, and integration basics with applied problem solving."
+      },
+      {
+        id: uid(),
+        title: "High School Algebra",
+        category: "High School Courses",
+        description: "Linear equations, functions, systems, polynomials, and graph interpretation."
+      },
+      {
+        id: uid(),
+        title: "SAT Math Prep",
+        category: "Exam Prep",
+        description: "Data analysis, algebra, geometry essentials, and timing tactics for SAT sections."
+      }
+    ],
+    requests: [],
+    questionnaires: [],
+    tests: []
+  };
+}
