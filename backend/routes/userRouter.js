@@ -19,6 +19,22 @@ const passport = require("passport");
 
 const userRouter = express.Router();
 
+function hasGitHubOAuthConfig() {
+	return Boolean(
+		process.env.GITHUB_CLIENT_ID &&
+			process.env.GITHUB_CLIENT_SECRET &&
+			process.env.GITHUB_CALLBACK_URL,
+	);
+}
+
+function hasGoogleOAuthConfig() {
+	return Boolean(
+		process.env.GOOGLE_CLIENT_ID &&
+			process.env.GOOGLE_CLIENT_SECRET &&
+			process.env.GOOGLE_CALLBACK_URL,
+	);
+}
+
 // ===== IMPORTANT: Specific routes MUST come BEFORE parameterized routes, so re-organized it =====
 
 // POST /users/register
@@ -51,6 +67,10 @@ userRouter.get("/dashboard", authMiddleware, getUserDashboard);
 
 // GitHub OAuth routes
 userRouter.get("/auth/github", (req, res, next) => {
+	if (!hasGitHubOAuthConfig()) {
+		return res.status(503).json({ message: "GitHub OAuth is not configured" });
+	}
+
 	const role = req.query.role || "learner"; //get the role from query params, default to 'learner'
 	const state = JSON.stringify({ role }); //save the role into state parameter to be used when in the callback
 	passport.authenticate("github", {
@@ -62,6 +82,12 @@ userRouter.get("/auth/github", (req, res, next) => {
 
 userRouter.get(
 	"/auth/github/callback",
+	(req, res, next) => {
+		if (!hasGitHubOAuthConfig()) {
+			return res.status(503).json({ message: "GitHub OAuth is not configured" });
+		}
+		next();
+	},
 	passport.authenticate("github", {
 		failureRedirect: "/login",
 		session: false,
@@ -85,6 +111,10 @@ userRouter.get(
 
 // Google OAuth routes
 userRouter.get("/auth/google", (req, res, next) => {
+	if (!hasGoogleOAuthConfig()) {
+		return res.status(503).json({ message: "Google OAuth is not configured" });
+	}
+
 	const role = req.query.role || "learner"; //get the role from query params, default to 'learner'
 	const state = JSON.stringify({ role }); //save the role into state parameter to be used when in the callback
 	passport.authenticate("google", {
@@ -96,6 +126,12 @@ userRouter.get("/auth/google", (req, res, next) => {
 //google callback URI
 userRouter.get(
 	"/auth/google/callback",
+	(req, res, next) => {
+		if (!hasGoogleOAuthConfig()) {
+			return res.status(503).json({ message: "Google OAuth is not configured" });
+		}
+		next();
+	},
 	passport.authenticate("google", {
 		failureRedirect: "/login",
 		session: false,
