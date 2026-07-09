@@ -1,6 +1,6 @@
 [build]
   base = "frontend"
-  command = "npm ci --include=optional && npm run build"
+  command = "npm ci --include=optional --workspaces=false && npm run build --workspaces=false"
   publish = "dist"
 
 [build.environment]
