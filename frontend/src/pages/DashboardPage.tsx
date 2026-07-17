@@ -1,7 +1,18 @@
-import { FormEvent } from "react";
+import { FormEvent, useState } from "react";
 import { useAppContext } from "../context/AppContext";
 import { stars } from "../lib/format";
-import type { Course, FaqItem, Review } from "../types";
+import type { Course, FaqItem, Review, SelectableOptionKey } from "../types";
+
+const optionGroupLabels: Record<SelectableOptionKey, string> = {
+  contactMethods: "Contact Methods",
+  serviceTypes: "Tutoring Service Types",
+  urgencyWindows: "Exam Urgency Windows",
+  urgencyFlags: "Urgency Choices",
+  assessmentSubjects: "Assessment Subjects",
+  courseCategories: "Course Categories"
+};
+
+const optionGroupKeys = Object.keys(optionGroupLabels) as SelectableOptionKey[];
 
 export default function DashboardPage() {
   const {
@@ -13,8 +24,13 @@ export default function DashboardPage() {
     addReview,
     deleteReview,
     addFaq,
-    deleteFaq
+    deleteFaq,
+    addSelectableOption,
+    updateSelectableOption,
+    deleteSelectableOption
   } = useAppContext();
+  const [selectedOptionGroup, setSelectedOptionGroup] = useState<SelectableOptionKey>("contactMethods");
+  const [optionFeedback, setOptionFeedback] = useState("");
 
   const myRequests = currentUser ? db.requests.filter((r) => r.userId === currentUser.id) : [];
 
@@ -44,6 +60,23 @@ export default function DashboardPage() {
     const fd = new FormData(e.currentTarget);
     addFaq(String(fd.get("question") ?? ""), String(fd.get("answer") ?? ""));
     e.currentTarget.reset();
+  }
+
+  async function handleAddSelectableOption(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!currentUser || currentUser.role !== "admin") return;
+    const fd = new FormData(e.currentTarget);
+    const result = await addSelectableOption(selectedOptionGroup, String(fd.get("optionValue") ?? ""));
+    setOptionFeedback(result.message);
+    if (result.ok) e.currentTarget.reset();
+  }
+
+  async function handleUpdateSelectableOption(e: FormEvent<HTMLFormElement>, index: number) {
+    e.preventDefault();
+    if (!currentUser || currentUser.role !== "admin") return;
+    const fd = new FormData(e.currentTarget);
+    const result = await updateSelectableOption(selectedOptionGroup, index, String(fd.get("optionValue") ?? ""));
+    setOptionFeedback(result.message);
   }
 
   return (
@@ -98,9 +131,9 @@ export default function DashboardPage() {
               <label>Title<input name="title" required /></label>
               <label>Category
                 <select name="category" required>
-                  <option>University Courses</option>
-                  <option>High School Courses</option>
-                  <option>Exam Prep</option>
+                  {db.selectableOptions.courseCategories.map((option) => (
+                    <option key={option}>{option}</option>
+                  ))}
                 </select>
               </label>
               <label>Topics/Description<textarea name="description" rows={3} required /></label>
@@ -137,23 +170,70 @@ export default function DashboardPage() {
           </div>
 
           {currentUser.role === "admin" ? (
-            <div className="card">
-              <h3>Manage FAQ (Admin Only)</h3>
-              <form onSubmit={handleAddFaq}>
-                <label>Question<input name="question" required /></label>
-                <label>Answer<textarea name="answer" rows={2} required /></label>
-                <button className="primary" type="submit">Add FAQ</button>
-              </form>
-              <div className="list">
-                {db.faq.map((faq: FaqItem) => (
-                  <div className="list-item" key={faq.id}>
-                    <strong>{faq.question}</strong>
-                    <p>{faq.answer}</p>
-                    <button className="danger" type="button" onClick={() => deleteFaq(faq.id)}>Delete</button>
-                  </div>
-                ))}
+            <>
+              <div className="card">
+                <h3>Manage Student Form Options</h3>
+                <label>
+                  Option Group
+                  <select
+                    value={selectedOptionGroup}
+                    onChange={(e) => {
+                      setSelectedOptionGroup(e.target.value as SelectableOptionKey);
+                      setOptionFeedback("");
+                    }}
+                  >
+                    {optionGroupKeys.map((key) => (
+                      <option key={key} value={key}>{optionGroupLabels[key]}</option>
+                    ))}
+                  </select>
+                </label>
+
+                <form onSubmit={handleAddSelectableOption}>
+                  <label>New Option<input name="optionValue" required /></label>
+                  <button className="primary" type="submit">Add Option</button>
+                </form>
+
+                <div className="list">
+                  {db.selectableOptions[selectedOptionGroup].map((option, index) => (
+                    <form className="list-item" key={`${selectedOptionGroup}-${option}-${index}`} onSubmit={(e) => handleUpdateSelectableOption(e, index)}>
+                      <label>Option Value<input name="optionValue" defaultValue={option} required /></label>
+                      <div className="row">
+                        <button type="submit">Save</button>
+                        <button
+                          className="danger"
+                          type="button"
+                          onClick={async () => {
+                            const result = await deleteSelectableOption(selectedOptionGroup, index);
+                            setOptionFeedback(result.ok ? "Option deleted." : result.message);
+                          }}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </form>
+                  ))}
+                </div>
+                <p className="feedback">{optionFeedback}</p>
               </div>
-            </div>
+
+              <div className="card">
+                <h3>Manage FAQ (Admin Only)</h3>
+                <form onSubmit={handleAddFaq}>
+                  <label>Question<input name="question" required /></label>
+                  <label>Answer<textarea name="answer" rows={2} required /></label>
+                  <button className="primary" type="submit">Add FAQ</button>
+                </form>
+                <div className="list">
+                  {db.faq.map((faq: FaqItem) => (
+                    <div className="list-item" key={faq.id}>
+                      <strong>{faq.question}</strong>
+                      <p>{faq.answer}</p>
+                      <button className="danger" type="button" onClick={() => deleteFaq(faq.id)}>Delete</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
           ) : null}
         </div>
       ) : null}

@@ -3,7 +3,7 @@ import { testQuestions } from "../data/testQuestions";
 import { apiClient } from "../clients/apiClient";
 import { uid } from "../lib/id";
 import { loadDB, saveDB } from "../lib/storage";
-import type { Course, DB, User } from "../types";
+import type { Course, DB, SelectableOptionKey, SelectableOptions, User } from "../types";
 
 interface ContactPayload {
   name: string;
@@ -48,6 +48,11 @@ interface LoginResponse {
   dbUser: BackendUser;
 }
 
+interface SettingsResponse {
+  message?: string;
+  selectableOptions: SelectableOptions;
+}
+
 interface AppContextValue {
   db: DB;
   currentUser: User | null;
@@ -65,6 +70,9 @@ interface AppContextValue {
   deleteReview: (reviewId: string) => void;
   addFaq: (question: string, answer: string) => void;
   deleteFaq: (faqId: string) => void;
+  addSelectableOption: (key: SelectableOptionKey, value: string) => Promise<{ ok: boolean; message: string }>;
+  updateSelectableOption: (key: SelectableOptionKey, index: number, value: string) => Promise<{ ok: boolean; message: string }>;
+  deleteSelectableOption: (key: SelectableOptionKey, index: number) => Promise<{ ok: boolean; message: string }>;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -104,12 +112,35 @@ function splitName(name: string): { firstname: string; lastname: string } {
   };
 }
 
+function cleanOption(value: string): string {
+  return value.trim().replace(/\s+/g, " ");
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const [db, setDB] = useState<DB>(() => loadDB());
 
   useEffect(() => {
     saveDB(db);
   }, [db]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    apiClient.get<SettingsResponse>("/settings")
+      .then((response) => {
+        if (cancelled) return;
+        updateDB((draft) => {
+          draft.selectableOptions = response.data.selectableOptions;
+        });
+      })
+      .catch((err) => {
+        console.warn("Failed to load site settings:", err);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const currentUser = useMemo(() => db.users.find((u) => u.id === db.currentUserId) ?? null, [db.users, db.currentUserId]);
   const canUseAssessment = currentUser?.role === "student" || currentUser?.role === "parent";
@@ -302,6 +333,55 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
   }
 
+  async function saveSelectableOptions(selectableOptions: SelectableOptions): Promise<{ ok: boolean; message: string }> {
+    try {
+      const response = await apiClient.put<SettingsResponse>("/settings/selectable-options", { selectableOptions });
+      updateDB((draft) => {
+        draft.selectableOptions = response.data.selectableOptions;
+      });
+      return { ok: true, message: response.data.message ?? "Options updated." };
+    } catch (err) {
+      return { ok: false, message: err instanceof Error ? err.message : "Failed to save options." };
+    }
+  }
+
+  async function addSelectableOption(key: SelectableOptionKey, value: string): Promise<{ ok: boolean; message: string }> {
+    const option = cleanOption(value);
+    if (!option) return { ok: false, message: "Option value is required." };
+
+    const existingOptions = db.selectableOptions[key] ?? [];
+    if (existingOptions.some((item) => item.toLowerCase() === option.toLowerCase())) {
+      return { ok: false, message: "Option already exists." };
+    }
+
+    return saveSelectableOptions({
+      ...db.selectableOptions,
+      [key]: [...existingOptions, option]
+    });
+  }
+
+  async function updateSelectableOption(key: SelectableOptionKey, index: number, value: string): Promise<{ ok: boolean; message: string }> {
+    const option = cleanOption(value);
+    if (!option) return { ok: false, message: "Option value is required." };
+
+    const existingOptions = db.selectableOptions[key] ?? [];
+    if (existingOptions.some((item, itemIndex) => itemIndex !== index && item.toLowerCase() === option.toLowerCase())) {
+      return { ok: false, message: "Option already exists." };
+    }
+
+    return saveSelectableOptions({
+      ...db.selectableOptions,
+      [key]: existingOptions.map((item, itemIndex) => (itemIndex === index ? option : item))
+    });
+  }
+
+  async function deleteSelectableOption(key: SelectableOptionKey, index: number): Promise<{ ok: boolean; message: string }> {
+    return saveSelectableOptions({
+      ...db.selectableOptions,
+      [key]: db.selectableOptions[key].filter((_, itemIndex) => itemIndex !== index)
+    });
+  }
+
   const value: AppContextValue = {
     db,
     currentUser,
@@ -318,7 +398,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     addReview,
     deleteReview,
     addFaq,
-    deleteFaq
+    deleteFaq,
+    addSelectableOption,
+    updateSelectableOption,
+    deleteSelectableOption
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

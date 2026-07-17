@@ -25,9 +25,19 @@ export interface FaqItem {
 export interface Course {
   id: string;
   title: string;
-  category: "University Courses" | "High School Courses" | "Exam Prep";
+  category: string;
   description: string;
 }
+
+export type SelectableOptionKey =
+  | "contactMethods"
+  | "serviceTypes"
+  | "urgencyWindows"
+  | "urgencyFlags"
+  | "assessmentSubjects"
+  | "courseCategories";
+
+export type SelectableOptions = Record<SelectableOptionKey, string[]>;
 
 export interface BookingRequest {
   id: string;
@@ -80,6 +90,7 @@ export interface TestQuestion {
 export interface DB {
   users: User[];
   currentUserId: string | null;
+  selectableOptions: SelectableOptions;
   reviews: Review[];
   faq: FaqItem[];
   courses: Course[];

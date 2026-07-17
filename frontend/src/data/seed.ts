@@ -1,5 +1,14 @@
-import type { DB } from "../types";
+import type { DB, SelectableOptions } from "../types";
 import { uid } from "../lib/id";
+
+export const defaultSelectableOptions: SelectableOptions = {
+  contactMethods: ["Email", "Phone", "WhatsApp"],
+  serviceTypes: ["High School", "University", "Exam Prep"],
+  urgencyWindows: ["Within 2 weeks", "Within 1 month", "Within 3 months"],
+  urgencyFlags: ["No", "Yes"],
+  assessmentSubjects: ["Math", "Physics", "Both"],
+  courseCategories: ["University Courses", "High School Courses", "Exam Prep"]
+};
 
 export function createSeedData(): DB {
   return {
@@ -9,6 +18,7 @@ export function createSeedData(): DB {
       { id: "u3", name: "Student User", email: "student@site.com", password: "student123", role: "student" }
     ],
     currentUserId: null,
+    selectableOptions: defaultSelectableOptions,
     reviews: [
       { id: uid(), name: "L.M.", rating: 5, text: "Clear explanations and strong structure." },
       { id: uid(), name: "A.K.", rating: 5, text: "Helped me improve quickly before exams." }

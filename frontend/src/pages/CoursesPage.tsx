@@ -1,15 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAppContext } from "../context/AppContext";
-import type { Course } from "../types";
-
-type CourseCategory = "All" | Course["category"];
-
-const categories: CourseCategory[] = ["All", "University Courses", "High School Courses", "Exam Prep"];
 
 export default function CoursesPage() {
   const { db } = useAppContext();
-  const [categoryFilter, setCategoryFilter] = useState<CourseCategory>("All");
+  const [categoryFilter, setCategoryFilter] = useState("All");
   const [selectedCourseId, setSelectedCourseId] = useState("");
+  const categories = useMemo(() => ["All", ...db.selectableOptions.courseCategories], [db.selectableOptions.courseCategories]);
 
   const filteredCourses = useMemo(() => {
     if (categoryFilter === "All") return db.courses;
@@ -38,7 +34,7 @@ export default function CoursesPage() {
       <div className="filters">
         <label>
           Category
-          <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value as CourseCategory)}>
+          <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
             {categories.map((cat) => (
               <option key={cat} value={cat}>{cat}</option>
             ))}

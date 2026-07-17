@@ -2,7 +2,7 @@ import { FormEvent, useState } from "react";
 import { useAppContext } from "../context/AppContext";
 
 export default function ContactPage() {
-  const { submitContact } = useAppContext();
+  const { db, submitContact } = useAppContext();
   const [feedback, setFeedback] = useState("");
 
   function handleSubmit(e: FormEvent<HTMLFormElement>) {
@@ -36,9 +36,9 @@ export default function ContactPage() {
         <label>Best Way to Contact
           <select name="contactMethod" required>
             <option value="">Select...</option>
-            <option>Email</option>
-            <option>Phone</option>
-            <option>WhatsApp</option>
+            {db.selectableOptions.contactMethods.map((option) => (
+              <option key={option}>{option}</option>
+            ))}
           </select>
         </label>
         <label>Email<input name="email" type="email" required /></label>
@@ -46,24 +46,25 @@ export default function ContactPage() {
         <label>Tutoring Service Type
           <select name="serviceType" required>
             <option value="">Select...</option>
-            <option>High School</option>
-            <option>University</option>
-            <option>Exam Prep</option>
+            {db.selectableOptions.serviceTypes.map((option) => (
+              <option key={option}>{option}</option>
+            ))}
           </select>
         </label>
         <label>Subject<input name="subject" placeholder="Math / Physics / ..." /></label>
         <label>Exam Urgency
           <select name="urgencyWindow">
             <option value="">Select...</option>
-            <option>Within 2 weeks</option>
-            <option>Within 1 month</option>
-            <option>Within 3 months</option>
+            {db.selectableOptions.urgencyWindows.map((option) => (
+              <option key={option}>{option}</option>
+            ))}
           </select>
         </label>
         <label>Is This Urgent?
           <select name="isUrgent">
-            <option>No</option>
-            <option>Yes</option>
+            {db.selectableOptions.urgencyFlags.map((option) => (
+              <option key={option}>{option}</option>
+            ))}
           </select>
         </label>
         <label>Hard Topics<textarea name="hardTopics" rows={2} /></label>

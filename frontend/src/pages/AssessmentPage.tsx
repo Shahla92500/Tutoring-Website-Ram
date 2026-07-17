@@ -119,9 +119,9 @@ export default function AssessmentPage() {
               <label>Main Subject
                 <select name="subject" required>
                   <option value="">Select...</option>
-                  <option>Math</option>
-                  <option>Physics</option>
-                  <option>Both</option>
+                  {db.selectableOptions.assessmentSubjects.map((option) => (
+                    <option key={option}>{option}</option>
+                  ))}
                 </select>
               </label>
               <label>Goal<input name="goal" required /></label>

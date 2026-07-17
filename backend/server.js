@@ -32,6 +32,7 @@ require("./config/passport");
 app.use("/users", require("./routes/userRouter"));
 app.use("/requests", require("./routes/requestRouter"));
 app.use("/availability", require("./routes/availabilityRouter"));
+app.use("/settings", require("./routes/settingsRouter"));
 
 
 app.get("/", (req, res) => {
