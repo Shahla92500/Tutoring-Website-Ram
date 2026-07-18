@@ -17,6 +17,8 @@
   --brand-dark: #78d924;
   --line: #2d5578;
   --danger: #ff5f83;
+  --font-body: "Avenir Next", "Trebuchet MS", "Segoe UI", Arial, sans-serif;
+  --font-display: "Copperplate", "Papyrus", "Avenir Next", "Trebuchet MS", fantasy;
 }
 
 * {
@@ -25,13 +27,14 @@
 
 body {
   margin: 0;
-  font-family: "Manrope", "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--font-body);
   color: var(--text);
   background:
     radial-gradient(circle at 18% 8%, rgba(184, 255, 87, 0.14), transparent 26%),
     radial-gradient(circle at 82% 14%, rgba(183, 101, 255, 0.16), transparent 24%),
     linear-gradient(180deg, #041125 0%, #071b34 48%, #06182f 100%);
   line-height: 1.45;
+  font-weight: 500;
 }
 
 .container {
@@ -62,8 +65,10 @@ body {
   align-items: center;
   gap: 0.5rem;
   font-size: 1.25rem;
-  font-weight: 800;
+  font-family: var(--font-display);
+  font-weight: 900;
   color: var(--phosphor);
+  text-transform: uppercase;
 }
 
 .brand-icon {
@@ -89,6 +94,7 @@ body {
   background: transparent;
   color: #d8ecff;
   font-size: 0.9rem;
+  font-weight: 700;
   padding: 0.42rem 0.72rem;
   border-radius: 8px;
   cursor: pointer;
@@ -158,15 +164,19 @@ body {
 
 .hero-copy h2 {
   margin: 0.2rem 0 0.55rem;
+  font-family: var(--font-display);
+  font-weight: 900;
   font-size: clamp(1.5rem, 3vw, 2.35rem);
   line-height: 1.15;
+  text-transform: uppercase;
 }
 
 .hero-kicker {
   margin: 0;
   font-size: 0.82rem;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
+  font-weight: 900;
   color: var(--pistachio);
 }
 
@@ -182,6 +192,10 @@ h2,
 h3,
 h4 {
   margin: 0;
+  font-family: var(--font-display);
+  font-weight: 900;
+  color: #ffffff;
+  text-transform: uppercase;
 }
 
 h2 + p,
