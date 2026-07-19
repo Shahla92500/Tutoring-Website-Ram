@@ -4,6 +4,8 @@ import { useAppContext } from "../context/AppContext";
 export default function Header() {
   const { currentUser, logout } = useAppContext();
   const navigate = useNavigate();
+  const canUseAssessment = !currentUser || currentUser.role === "student" || currentUser.role === "parent";
+  const contactLabel = currentUser?.role === "admin" ? "Contact Ops" : currentUser?.role === "tutor" ? "Requests" : "Contact";
 
   return (
     <header className="site-header">
@@ -16,8 +18,10 @@ export default function Header() {
             <li><NavLink to="/" className={({ isActive }) => `nav-btn ${isActive ? "active" : ""}`}>Home</NavLink></li>
             <li><NavLink to="/courses" className={({ isActive }) => `nav-btn ${isActive ? "active" : ""}`}>Courses</NavLink></li>
             <li><NavLink to="/exam-prep" className={({ isActive }) => `nav-btn ${isActive ? "active" : ""}`}>Exam Prep</NavLink></li>
-            <li><NavLink to="/assessment" className={({ isActive }) => `nav-btn ${isActive ? "active" : ""}`}>Assessment</NavLink></li>
-            <li><NavLink to="/contact" className={({ isActive }) => `nav-btn ${isActive ? "active" : ""}`}>Contact</NavLink></li>
+            {canUseAssessment ? (
+              <li><NavLink to="/assessment" className={({ isActive }) => `nav-btn ${isActive ? "active" : ""}`}>Assessment</NavLink></li>
+            ) : null}
+            <li><NavLink to="/contact" className={({ isActive }) => `nav-btn ${isActive ? "active" : ""}`}>{contactLabel}</NavLink></li>
             <li>
               {currentUser ? (
                 <button
@@ -28,7 +32,7 @@ export default function Header() {
                     navigate("/");
                   }}
                 >
-                  Logout ({currentUser.role})
+                  Logout ({currentUser.name})
                 </button>
               ) : (
                 <NavLink to="/login" className={({ isActive }) => `nav-btn ${isActive ? "active" : ""}`}>Login</NavLink>

@@ -33,6 +33,9 @@ export default function AssessmentPage() {
   );
 
   const activeQuestion = testQuestions[testState.currentIndex];
+  const gateMessage = currentUser
+    ? `Assessment is available for learner or parent accounts. You are currently logged in as ${currentUser.role}.`
+    : "Login is required to start questionnaire and test.";
 
   function handleQuestionnaireSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -103,12 +106,14 @@ export default function AssessmentPage() {
   return (
     <section data-page="assessment" className="page">
       <h2>Assessment</h2>
-      <p className="muted">Login is required to access assessment tools.</p>
+      <p className="muted">Learner and parent accounts can use assessment tools.</p>
 
       {!canUseAssessment ? (
         <div className="card" id="assessment-gate">
-          <p id="assessment-gate-message">Login is required to start questionnaire and test.</p>
-          <button className="primary" onClick={() => navigate("/login")}>Login Required</button>
+          <p id="assessment-gate-message">{gateMessage}</p>
+          <button className="primary" onClick={() => navigate(currentUser ? "/dashboard" : "/login")}>
+            {currentUser ? "Go To Dashboard" : "Login Required"}
+          </button>
         </div>
       ) : (
         <div id="assessment-content">

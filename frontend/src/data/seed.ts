@@ -11,6 +11,10 @@ export const defaultSelectableOptions: SelectableOptions = {
 };
 
 export function createSeedData(): DB {
+  const calculusCourseId = uid();
+  const algebraCourseId = uid();
+  const satCourseId = uid();
+
   return {
     users: [
       { id: "u1", name: "Admin User", email: "admin@site.com", password: "admin123", role: "admin" },
@@ -37,22 +41,45 @@ export function createSeedData(): DB {
     ],
     courses: [
       {
-        id: uid(),
+        id: calculusCourseId,
         title: "Calculus I",
         category: "University Courses",
         description: "Limits, derivatives, optimization, and integration basics with applied problem solving."
       },
       {
-        id: uid(),
+        id: algebraCourseId,
         title: "High School Algebra",
         category: "High School Courses",
         description: "Linear equations, functions, systems, polynomials, and graph interpretation."
       },
       {
-        id: uid(),
+        id: satCourseId,
         title: "SAT Math Prep",
         category: "Exam Prep",
         description: "Data analysis, algebra, geometry essentials, and timing tactics for SAT sections."
+      }
+    ],
+    learnerCourses: [
+      {
+        id: uid(),
+        userId: "u3",
+        courseId: calculusCourseId,
+        status: "in-progress",
+        registeredAt: new Date().toISOString()
+      },
+      {
+        id: uid(),
+        userId: "u3",
+        courseId: algebraCourseId,
+        status: "passed",
+        registeredAt: new Date().toISOString()
+      },
+      {
+        id: uid(),
+        userId: "u3",
+        courseId: satCourseId,
+        status: "registered",
+        registeredAt: new Date().toISOString()
       }
     ],
     requests: [],

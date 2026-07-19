@@ -29,6 +29,16 @@ export interface Course {
   description: string;
 }
 
+export type CourseProgressStatus = "registered" | "in-progress" | "passed";
+
+export interface LearnerCourseRecord {
+  id: string;
+  userId: string;
+  courseId: string;
+  status: CourseProgressStatus;
+  registeredAt: string;
+}
+
 export type SelectableOptionKey =
   | "contactMethods"
   | "serviceTypes"
@@ -94,6 +104,7 @@ export interface DB {
   reviews: Review[];
   faq: FaqItem[];
   courses: Course[];
+  learnerCourses: LearnerCourseRecord[];
   requests: BookingRequest[];
   questionnaires: Questionnaire[];
   tests: TestRecord[];

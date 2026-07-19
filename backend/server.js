@@ -12,13 +12,24 @@ dbConnect();
 
 const app = express();
 const PORT = process.env.PORT || 4000;
+const configuredFrontendUrls = (process.env.FRONTEND_URL || "http://localhost:5173")
+  .split(",")
+  .map((url) => url.trim())
+  .filter(Boolean);
 
 // ===== Middleware =====
 app.use(morgan("dev"));
 
 // Updated CORS configuration
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin(origin, callback) {
+    if (!origin) return callback(null, true);
+    const isLocalDev = /^http:\/\/localhost:\d+$/.test(origin);
+    if (isLocalDev || configuredFrontendUrls.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error("Not allowed by CORS"));
+  },
   credentials: true
 }));
 

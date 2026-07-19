@@ -15,6 +15,7 @@ export function loadDB(): DB {
     ...defaultSelectableOptions,
     ...(db.selectableOptions ?? {})
   };
+  db.learnerCourses = db.learnerCourses ?? [];
   return db;
 }
 

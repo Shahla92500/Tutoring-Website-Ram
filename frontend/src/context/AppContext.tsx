@@ -3,7 +3,7 @@ import { testQuestions } from "../data/testQuestions";
 import { apiClient } from "../clients/apiClient";
 import { uid } from "../lib/id";
 import { loadDB, saveDB } from "../lib/storage";
-import type { Course, DB, SelectableOptionKey, SelectableOptions, User } from "../types";
+import type { Course, CourseProgressStatus, DB, LearnerCourseRecord, SelectableOptionKey, SelectableOptions, User } from "../types";
 
 interface ContactPayload {
   name: string;
@@ -65,7 +65,13 @@ interface AppContextValue {
   submitTest: (answers: number[], explanations: string[]) => { score: number; total: number; recommendation: string };
   updateRequestStatus: (requestId: string, status: "replied" | "closed") => void;
   addCourse: (course: Omit<Course, "id">) => void;
+  updateCourse: (courseId: string, course: Omit<Course, "id">) => void;
   deleteCourse: (courseId: string) => void;
+  assignCourseToLearner: (payload: Omit<LearnerCourseRecord, "id" | "registeredAt">) => { ok: boolean; message: string };
+  updateLearnerCourseStatus: (recordId: string, status: CourseProgressStatus) => void;
+  deleteLearnerCourse: (recordId: string) => void;
+  createTutor: (payload: { name: string; email: string; password: string }) => Promise<{ ok: boolean; message: string }>;
+  resetLearnerAccount: (email: string) => Promise<{ ok: boolean; message: string }>;
   addReview: (name: string, rating: number, text: string) => void;
   deleteReview: (reviewId: string) => void;
   addFaq: (question: string, answer: string) => void;
@@ -93,13 +99,13 @@ function toFrontendRole(role: BackendUser["role"]): User["role"] {
   return "student";
 }
 
-function backendUserToFrontendUser(user: BackendUser, password = ""): User {
+function backendUserToFrontendUser(user: BackendUser): User {
   const fullName = `${user.firstname ?? ""} ${user.lastname ?? ""}`.trim();
   return {
     id: user._id,
     name: fullName || user.username || user.email,
     email: user.email,
-    password,
+    password: "",
     role: toFrontendRole(user.role)
   };
 }
@@ -161,7 +167,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         email: normalizedEmail,
         password
       });
-      const user = backendUserToFrontendUser(response.data.dbUser, password);
+      const user = backendUserToFrontendUser(response.data.dbUser);
 
       localStorage.setItem("peertrack_token", response.data.token);
       updateDB((draft) => {
@@ -303,10 +309,105 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
   }
 
+  function updateCourse(courseId: string, course: Omit<Course, "id">): void {
+    updateDB((draft) => {
+      const existingCourse = draft.courses.find((item) => item.id === courseId);
+      if (existingCourse) {
+        existingCourse.title = course.title;
+        existingCourse.category = course.category;
+        existingCourse.description = course.description;
+      }
+    });
+  }
+
   function deleteCourse(courseId: string): void {
     updateDB((draft) => {
       draft.courses = draft.courses.filter((c) => c.id !== courseId);
+      draft.learnerCourses = draft.learnerCourses.filter((record) => record.courseId !== courseId);
     });
+  }
+
+  function assignCourseToLearner(payload: Omit<LearnerCourseRecord, "id" | "registeredAt">): { ok: boolean; message: string } {
+    if (!payload.userId) return { ok: false, message: "Please select a learner." };
+    if (!payload.courseId) return { ok: false, message: "Please select a course." };
+
+    const alreadyAssigned = db.learnerCourses.some(
+      (record) => record.userId === payload.userId && record.courseId === payload.courseId
+    );
+    if (alreadyAssigned) return { ok: false, message: "This course is already assigned to this learner." };
+
+    updateDB((draft) => {
+      draft.learnerCourses.push({
+        id: uid(),
+        ...payload,
+        registeredAt: new Date().toISOString()
+      });
+    });
+
+    return { ok: true, message: "Course assigned to learner." };
+  }
+
+  function updateLearnerCourseStatus(recordId: string, status: CourseProgressStatus): void {
+    updateDB((draft) => {
+      const record = draft.learnerCourses.find((item) => item.id === recordId);
+      if (record) record.status = status;
+    });
+  }
+
+  function deleteLearnerCourse(recordId: string): void {
+    updateDB((draft) => {
+      draft.learnerCourses = draft.learnerCourses.filter((record) => record.id !== recordId);
+    });
+  }
+
+  async function createTutor(payload: { name: string; email: string; password: string }): Promise<{ ok: boolean; message: string }> {
+    const email = payload.email.trim().toLowerCase();
+    const { firstname, lastname } = splitName(payload.name);
+    const username = email.split("@")[0] || `tutor_${uid()}`;
+
+    try {
+      await apiClient.post<{ message: string }>("/users/register", {
+        username,
+        email,
+        password: payload.password,
+        role: "alumni",
+        firstname,
+        lastname
+      });
+
+      updateDB((draft) => {
+        const existingIndex = draft.users.findIndex((user) => user.email.toLowerCase() === email);
+        const tutor: User = {
+          id: `local-tutor-${uid()}`,
+          name: payload.name.trim() || username,
+          email,
+          password: "",
+          role: "tutor"
+        };
+
+        if (existingIndex >= 0) {
+          draft.users[existingIndex] = { ...draft.users[existingIndex], ...tutor, id: draft.users[existingIndex].id };
+        } else {
+          draft.users.push(tutor);
+        }
+      });
+
+      return { ok: true, message: "Tutor account created." };
+    } catch (err) {
+      return { ok: false, message: err instanceof Error ? err.message : "Failed to create tutor." };
+    }
+  }
+
+  async function resetLearnerAccount(email: string): Promise<{ ok: boolean; message: string }> {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) return { ok: false, message: "Please enter the learner email." };
+
+    try {
+      const response = await apiClient.post<{ message?: string }>("/users/forgot-password", { email: normalizedEmail });
+      return { ok: true, message: response.data.message ?? "Password reset email requested." };
+    } catch (err) {
+      return { ok: false, message: err instanceof Error ? err.message : "Failed to request password reset." };
+    }
   }
 
   function addReview(name: string, rating: number, text: string): void {
@@ -394,7 +495,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     submitTest,
     updateRequestStatus,
     addCourse,
+    updateCourse,
     deleteCourse,
+    assignCourseToLearner,
+    updateLearnerCourseStatus,
+    deleteLearnerCourse,
+    createTutor,
+    resetLearnerAccount,
     addReview,
     deleteReview,
     addFaq,

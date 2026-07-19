@@ -8,6 +8,40 @@ const bcrypt = require("bcrypt");
 
 const { sendMail } = require("../utils/mailer");
 
+function isValidEmail(email) {
+	return /.+@.+\..+/.test(email);
+}
+
+function formatDuplicateField(field) {
+	if (field === "email") return "This email is already registered. Please log in or use another email.";
+	if (field === "username") return "This username is already taken. Please use another email or username.";
+	return `${field} already exists.`;
+}
+
+function getValidationMessage(error) {
+	const messages = Object.values(error.errors).map((err) => {
+		if (err.path === "email") return "Please enter a valid email address.";
+		if (err.path === "password") return "Please enter a valid password.";
+		if (err.path === "username") return "Please enter a username.";
+		if (err.path === "role") return "Please select a valid account role.";
+		return err.message;
+	});
+	return messages.join(" ");
+}
+
+function sendServerError(res, action, error) {
+	console.error(`${action} error:`, error);
+	if (error.name === "MongoServerSelectionError" || error.name === "MongooseServerSelectionError") {
+		return res.status(503).json({
+			message: "The database is temporarily unavailable. Please try again in a few minutes.",
+		});
+	}
+
+	return res.status(500).json({
+		message: "Something went wrong on the server. Please try again later.",
+	});
+}
+
 async function listUsers(req, res) {
 	try {
 		const users = await User.find();
@@ -91,34 +125,56 @@ async function registerUser(req, res) {
 		console.log("=== REGISTRATION ATTEMPT ===");
 		console.log("Request body:", req.body);
 
-		const { username, email, password, role } = req.body;
+		const username = String(req.body.username || "").trim();
+		const email = String(req.body.email || "").trim().toLowerCase();
+		const password = req.body.password;
+		const role = req.body.role;
 
-		// Validate required fields
-		if (!username || !email || !password) {
+		if (!username) {
 			console.log("Missing required fields");
 			return res.status(400).json({
-				message: "Username, email, and password are required",
+				message: "Please enter your name.",
 			});
+		}
+
+		if (!email) {
+			return res.status(400).json({ message: "Please enter your email address." });
+		}
+
+		if (!isValidEmail(email)) {
+			return res.status(400).json({ message: "Please enter a valid email address." });
+		}
+
+		if (!password) {
+			return res.status(400).json({ message: "Please enter a password." });
+		}
+
+		if (String(password).length < 8) {
+			return res.status(400).json({ message: "Password must be at least 8 characters long." });
 		}
 
 		console.log("Checking if email exists...");
 		const alreadyExist = await User.findOne({ email });
 		if (alreadyExist) {
 			console.log("Email already exists");
-			return res.status(400).json({ message: "Email already exists" });
+			return res.status(400).json({
+				message: "This email is already registered. Please log in or use another email.",
+			});
 		}
 
 		console.log("Checking if username exists...");
 		const usernameExists = await User.findOne({ username });
 		if (usernameExists) {
 			console.log("Username already exists");
-			return res.status(400).json({ message: "Username already in use" });
+			return res.status(400).json({
+				message: "This username is already taken. Please use another email or username.",
+			});
 		}
 
 		//validate users role
 		if (role && !["learner", "alumni", "admin"].includes(role)) {
 			console.log("Invalid role provided:", role);
-			return res.status(400).json({ message: "Invalid role" });
+			return res.status(400).json({ message: "Please select a valid account role." });
 		}
 
 		console.log("Creating new user...");
@@ -146,43 +202,42 @@ async function registerUser(req, res) {
 		if (error.code === 11000) {
 			const field = Object.keys(error.keyPattern)[0];
 			return res.status(400).json({
-				message: `${field} already in use`,
+				message: formatDuplicateField(field),
 			});
 		}
 
 		// Mongoose validation errors
 		if (error.name === "ValidationError") {
-			const messages = Object.values(error.errors).map((err) => err.message);
 			return res.status(400).json({
-				message: messages.join(", "),
+				message: getValidationMessage(error),
 			});
 		}
 
-		// Send detailed error for debugging
-		res.status(500).json({
-			message: "An unexpected error occurred during registration",
-			error: error.message,
-			details: process.env.NODE_ENV === "development" ? error.stack : undefined,
-		});
+		return sendServerError(res, "Registration", error);
 	}
 }
 
 async function loginUser(req, res) {
 	try {
-		const { email, password } = req.body;
+		const email = String(req.body.email || "").trim().toLowerCase();
+		const password = req.body.password;
+
+		if (!email) return res.status(400).json({ message: "Please enter your email address." });
+		if (!password) return res.status(400).json({ message: "Please enter your password." });
+		if (!isValidEmail(email)) return res.status(400).json({ message: "Please enter a valid email address." });
 
 		//check if user doesn't exist
 		const dbUser = await User.findOne({ email });
 
 		if (!dbUser) {
-			return res.status(400).json({ message: "Incorrect email or password" });
+			return res.status(400).json({ message: "The email or password is incorrect." });
 		}
 
 		//if user found
 		const passwordMatched = await dbUser.isCorrectPassword(password);
 
 		if (!passwordMatched) {
-			return res.status(400).json({ message: "Incorrect email or password" });
+			return res.status(400).json({ message: "The email or password is incorrect." });
 		}
 
 		//Create the JWT payload
@@ -199,7 +254,9 @@ async function loginUser(req, res) {
 		});
 
 		res.json({ token, dbUser });
-	} catch (error) {}
+	} catch (error) {
+		return sendServerError(res, "Login", error);
+	}
 }
 
 /** forgotPassword */

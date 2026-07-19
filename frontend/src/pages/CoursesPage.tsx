@@ -1,20 +1,23 @@
-import { useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useAppContext } from "../context/AppContext";
+import type { Course } from "../types";
 
 export default function CoursesPage() {
-  const { db } = useAppContext();
+  const { db, currentUser, addCourse, updateCourse, deleteCourse } = useAppContext();
   const [categoryFilter, setCategoryFilter] = useState("All");
   const [selectedCourseId, setSelectedCourseId] = useState("");
+  const [feedback, setFeedback] = useState("");
+  const isAdmin = currentUser?.role === "admin";
   const categories = useMemo(() => ["All", ...db.selectableOptions.courseCategories], [db.selectableOptions.courseCategories]);
 
   const filteredCourses = useMemo(() => {
     if (categoryFilter === "All") return db.courses;
-    return db.courses.filter((c) => c.category === categoryFilter);
+    return db.courses.filter((course) => course.category === categoryFilter);
   }, [db.courses, categoryFilter]);
 
   const selectedCourse = useMemo(() => {
     if (!filteredCourses.length) return null;
-    return filteredCourses.find((c) => c.id === selectedCourseId) ?? filteredCourses[0];
+    return filteredCourses.find((course) => course.id === selectedCourseId) ?? filteredCourses[0];
   }, [filteredCourses, selectedCourseId]);
 
   useEffect(() => {
@@ -22,15 +25,43 @@ export default function CoursesPage() {
       setSelectedCourseId("");
       return;
     }
-    if (!filteredCourses.some((c) => c.id === selectedCourseId)) {
+    if (!filteredCourses.some((course) => course.id === selectedCourseId)) {
       setSelectedCourseId(filteredCourses[0].id);
     }
   }, [filteredCourses, selectedCourseId]);
 
+  function handleAddCourse(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!isAdmin) return;
+    const fd = new FormData(e.currentTarget);
+    addCourse({
+      title: String(fd.get("title") ?? "").trim(),
+      category: String(fd.get("category") ?? "").trim(),
+      description: String(fd.get("description") ?? "").trim()
+    });
+    setFeedback("Course added.");
+    e.currentTarget.reset();
+  }
+
+  function handleUpdateCourse(e: FormEvent<HTMLFormElement>, course: Course) {
+    e.preventDefault();
+    if (!isAdmin) return;
+    const fd = new FormData(e.currentTarget);
+    updateCourse(course.id, {
+      title: String(fd.get("title") ?? "").trim(),
+      category: String(fd.get("category") ?? "").trim(),
+      description: String(fd.get("description") ?? "").trim()
+    });
+    setFeedback("Course updated.");
+  }
+
   return (
     <section data-page="courses" className="page">
       <h2>Courses</h2>
-      <p className="muted">Filter by category and select a course to view topics covered.</p>
+      <p className="muted">
+        {isAdmin ? "Browse courses and manage the catalog." : "Filter by category and select a course to view topics covered."}
+      </p>
+
       <div className="filters">
         <label>
           Category
@@ -53,6 +84,7 @@ export default function CoursesPage() {
           </select>
         </label>
       </div>
+
       <div className="card" id="course-details">
         {selectedCourse ? (
           <>
@@ -64,6 +96,61 @@ export default function CoursesPage() {
           <p className="muted">No courses found for this category.</p>
         )}
       </div>
+
+      {isAdmin ? (
+        <div className="dashboard-stack" id="courses-admin">
+          <div className="card">
+            <h3>Add Course</h3>
+            <form onSubmit={handleAddCourse}>
+              <label>Title<input name="title" required /></label>
+              <label>Category
+                <select name="category" required>
+                  {db.selectableOptions.courseCategories.map((category) => (
+                    <option key={category}>{category}</option>
+                  ))}
+                </select>
+              </label>
+              <label>Topics/Description<textarea name="description" rows={3} required /></label>
+              <button className="primary" type="submit">Add Course</button>
+            </form>
+          </div>
+
+          <div className="card">
+            <h3>Edit Courses</h3>
+            <div className="list">
+              {db.courses.length ? db.courses.map((course) => (
+                <form className="list-item" key={course.id} onSubmit={(e) => handleUpdateCourse(e, course)}>
+                  <label>Title<input name="title" defaultValue={course.title} required /></label>
+                  <label>Category
+                    <select name="category" defaultValue={course.category} required>
+                      {db.selectableOptions.courseCategories.map((category) => (
+                        <option key={category}>{category}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>Topics/Description<textarea name="description" rows={2} defaultValue={course.description} required /></label>
+                  <div className="row">
+                    <button type="submit">Save</button>
+                    <button
+                      className="danger"
+                      type="button"
+                      onClick={() => {
+                        deleteCourse(course.id);
+                        setFeedback("Course deleted.");
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </form>
+              )) : (
+                <p className="muted">No courses to edit.</p>
+              )}
+            </div>
+            <p className="feedback">{feedback}</p>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

@@ -4,9 +4,15 @@ import { useAppContext } from "../context/AppContext";
 import { stars } from "../lib/format";
 
 export default function HomePage() {
-  const { db } = useAppContext();
+  const { db, currentUser } = useAppContext();
   const navigate = useNavigate();
   const [faqOpenMap, setFaqOpenMap] = useState<Record<string, boolean>>({});
+  const isAdmin = currentUser?.role === "admin";
+  const isTutor = currentUser?.role === "tutor";
+  const canUseAssessment = !currentUser || currentUser.role === "student" || currentUser.role === "parent";
+  const primaryAction = isAdmin || isTutor ? "/dashboard" : "/contact";
+  const primaryLabel = isAdmin ? "Open Admin Dashboard" : isTutor ? "Open Tutor Dashboard" : "Get Started";
+  const contactLabel = isAdmin ? "Open Contact Operations" : isTutor ? "Open Request Inbox" : "Contact Me";
 
   return (
     <section data-page="home" className="page">
@@ -17,7 +23,7 @@ export default function HomePage() {
               <p className="hero-kicker">Math and Physics Tutoring</p>
               <h2>Ace Math and Physics with Expert Tutoring</h2>
               <p>Personalized support for University, IB, AP, SAT, and A-Level students.</p>
-              <button className="primary" onClick={() => navigate("/contact")}>Get Started</button>
+              <button className="primary" onClick={() => navigate(primaryAction)}>{primaryLabel}</button>
             </div>
           </div>
 
@@ -73,26 +79,36 @@ export default function HomePage() {
                 <div className="list-item muted">No FAQ items yet.</div>
               )}
             </div>
-            <button className="primary" onClick={() => navigate("/contact")}>Contact Me</button>
+            <button className="primary" onClick={() => navigate("/contact")}>{contactLabel}</button>
           </section>
         </div>
 
         <aside className="home-side">
           <section className="card side-panel top">
             <div className="side-head">
-              <h3>Login to Your Account</h3>
-              <button className="primary" onClick={() => navigate("/login")}>Login</button>
+              <h3>{currentUser ? "Your Workspace" : "Login to Your Account"}</h3>
+              <button className="primary" onClick={() => navigate(currentUser ? "/dashboard" : "/login")}>
+                {currentUser ? "Dashboard" : "Login"}
+              </button>
             </div>
-            <p className="muted">Access assessments, booking history, and progress records.</p>
+            <p className="muted">
+              {isAdmin
+                ? "Manage learners, tutors, courses, requests, and site content."
+                : isTutor
+                  ? "Review requests and tutor-facing course information."
+                  : "Access assessments, booking history, and progress records."}
+            </p>
           </section>
 
           <section className="card side-panel image">
             <h3>Teaching for Physics</h3>
             <p className="muted">Mechanics, algebra, and exam strategy with step-by-step guidance.</p>
             <ul className="quick-links">
-              <li><button onClick={() => navigate("/courses")}>See course topics</button></li>
-              <li><button onClick={() => navigate("/assessment")}>Do assessment</button></li>
-              <li><button onClick={() => navigate("/contact")}>Tutoring request</button></li>
+              <li><button onClick={() => navigate("/courses")}>{isAdmin ? "Manage courses" : "See course topics"}</button></li>
+              <li><button onClick={() => navigate(isAdmin ? "/exam-prep" : canUseAssessment ? "/assessment" : "/dashboard")}>
+                {isAdmin ? "Manage exam prep" : canUseAssessment ? "Do assessment" : "Open dashboard"}
+              </button></li>
+              <li><button onClick={() => navigate("/contact")}>{isAdmin || isTutor ? "Review requests" : "Tutoring request"}</button></li>
             </ul>
           </section>
 

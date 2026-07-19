@@ -1,9 +1,37 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import { useAppContext } from "../context/AppContext";
+import type { BookingRequest, SelectableOptionKey } from "../types";
+
+const contactOptionGroups: Array<{ key: SelectableOptionKey; label: string }> = [
+  { key: "contactMethods", label: "Contact Methods" },
+  { key: "serviceTypes", label: "Service Types" },
+  { key: "urgencyWindows", label: "Urgency Windows" },
+  { key: "urgencyFlags", label: "Urgency Choices" }
+];
+
+type RequestStatusFilter = "all" | BookingRequest["status"];
 
 export default function ContactPage() {
-  const { db, submitContact } = useAppContext();
+  const {
+    db,
+    currentUser,
+    submitContact,
+    updateRequestStatus,
+    addSelectableOption,
+    updateSelectableOption,
+    deleteSelectableOption
+  } = useAppContext();
   const [feedback, setFeedback] = useState("");
+  const [statusFilter, setStatusFilter] = useState<RequestStatusFilter>("all");
+  const [selectedOptionGroup, setSelectedOptionGroup] = useState<SelectableOptionKey>("contactMethods");
+  const isAdmin = currentUser?.role === "admin";
+  const isTutor = currentUser?.role === "tutor";
+
+  const filteredRequests = useMemo(() => {
+    const requests = [...db.requests].reverse();
+    if (statusFilter === "all") return requests;
+    return requests.filter((request) => request.status === statusFilter);
+  }, [db.requests, statusFilter]);
 
   function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -28,54 +56,229 @@ export default function ContactPage() {
     if (result.ok) e.currentTarget.reset();
   }
 
+  async function handleAddOption(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!isAdmin) return;
+    const fd = new FormData(e.currentTarget);
+    const result = await addSelectableOption(selectedOptionGroup, String(fd.get("optionValue") ?? ""));
+    setFeedback(result.message);
+    if (result.ok) e.currentTarget.reset();
+  }
+
+  async function handleUpdateOption(e: FormEvent<HTMLFormElement>, index: number) {
+    e.preventDefault();
+    if (!isAdmin) return;
+    const fd = new FormData(e.currentTarget);
+    const result = await updateSelectableOption(selectedOptionGroup, index, String(fd.get("optionValue") ?? ""));
+    setFeedback(result.message);
+  }
+
+  if (isAdmin) {
+    return (
+      <section data-page="contact" className="page">
+        <h2>Contact Operations</h2>
+        <p className="muted">Review booking requests and manage the choices shown in the contact form.</p>
+
+        <div className="dashboard-grid">
+          <StatCard label="New" value={db.requests.filter((request) => request.status === "new").length} />
+          <StatCard label="Replied" value={db.requests.filter((request) => request.status === "replied").length} />
+          <StatCard label="Closed" value={db.requests.filter((request) => request.status === "closed").length} />
+          <StatCard label="Urgent" value={db.requests.filter((request) => request.isUrgent === "Yes").length} />
+        </div>
+
+        <div className="grid-2">
+          <RequestsPanel
+            requests={filteredRequests}
+            statusFilter={statusFilter}
+            setStatusFilter={setStatusFilter}
+            updateRequestStatus={updateRequestStatus}
+            showContactDetails
+          />
+
+          <div className="card">
+            <h3>Manage Contact Form Choices</h3>
+            <label>Field Group
+              <select
+                value={selectedOptionGroup}
+                onChange={(e) => {
+                  setSelectedOptionGroup(e.target.value as SelectableOptionKey);
+                  setFeedback("");
+                }}
+              >
+                {contactOptionGroups.map((group) => (
+                  <option key={group.key} value={group.key}>{group.label}</option>
+                ))}
+              </select>
+            </label>
+            <form onSubmit={handleAddOption}>
+              <label>New Value<input name="optionValue" required /></label>
+              <button className="primary" type="submit">Add Value</button>
+            </form>
+            <div className="list">
+              {db.selectableOptions[selectedOptionGroup].map((option, index) => (
+                <form className="list-item" key={`${selectedOptionGroup}-${option}-${index}`} onSubmit={(e) => handleUpdateOption(e, index)}>
+                  <label>Value<input name="optionValue" defaultValue={option} required /></label>
+                  <div className="row">
+                    <button type="submit">Save</button>
+                    <button
+                      className="danger"
+                      type="button"
+                      onClick={async () => {
+                        const result = await deleteSelectableOption(selectedOptionGroup, index);
+                        setFeedback(result.ok ? "Value deleted." : result.message);
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </form>
+              ))}
+            </div>
+            <p className="feedback">{feedback}</p>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (isTutor) {
+    return (
+      <section data-page="contact" className="page">
+        <h2>Contact Requests</h2>
+        <p className="muted">Review learner requests and update follow-up status.</p>
+        <RequestsPanel
+          requests={filteredRequests}
+          statusFilter={statusFilter}
+          setStatusFilter={setStatusFilter}
+          updateRequestStatus={updateRequestStatus}
+          showContactDetails
+        />
+      </section>
+    );
+  }
+
   return (
     <section data-page="contact" className="page">
       <h2>Contact / Booking Request</h2>
-      <form id="contact-form" className="card" onSubmit={handleSubmit}>
-        <label>Name<input name="name" required /></label>
-        <label>Best Way to Contact
-          <select name="contactMethod" required>
-            <option value="">Select...</option>
-            {db.selectableOptions.contactMethods.map((option) => (
-              <option key={option}>{option}</option>
-            ))}
-          </select>
-        </label>
-        <label>Email<input name="email" type="email" required /></label>
-        <label>Phone<input name="phone" /></label>
-        <label>Tutoring Service Type
-          <select name="serviceType" required>
-            <option value="">Select...</option>
-            {db.selectableOptions.serviceTypes.map((option) => (
-              <option key={option}>{option}</option>
-            ))}
-          </select>
-        </label>
-        <label>Subject<input name="subject" placeholder="Math / Physics / ..." /></label>
-        <label>Exam Urgency
-          <select name="urgencyWindow">
-            <option value="">Select...</option>
-            {db.selectableOptions.urgencyWindows.map((option) => (
-              <option key={option}>{option}</option>
-            ))}
-          </select>
-        </label>
-        <label>Is This Urgent?
-          <select name="isUrgent">
-            {db.selectableOptions.urgencyFlags.map((option) => (
-              <option key={option}>{option}</option>
-            ))}
-          </select>
-        </label>
-        <label>Hard Topics<textarea name="hardTopics" rows={2} /></label>
-        <label>Preferred Slot<input name="preferredSlot" type="text" placeholder="Mon/Wed 6-8PM" /></label>
-        <label>Earliest Consultation Date<input name="earliestDate" type="date" /></label>
-        <label>Message<textarea name="message" required rows={4} /></label>
-        <label className="check-row"><input name="consultation" type="checkbox" /> Request consultation session</label>
-        <label className="check-row"><input name="notRobot" type="checkbox" required /> I'm not a robot</label>
-        <button className="primary" type="submit">Submit Request</button>
-        <p className="feedback">{feedback}</p>
-      </form>
+      <p className="muted">Send your tutoring request with your subject, timeline, and preferred contact method.</p>
+      <ContactRequestForm db={db} feedback={feedback} handleSubmit={handleSubmit} />
     </section>
+  );
+}
+
+function ContactRequestForm({
+  db,
+  feedback,
+  handleSubmit
+}: {
+  db: ReturnType<typeof useAppContext>["db"];
+  feedback: string;
+  handleSubmit: (e: FormEvent<HTMLFormElement>) => void;
+}) {
+  return (
+    <form id="contact-form" className="card" onSubmit={handleSubmit}>
+      <label>Name<input name="name" required /></label>
+      <label>Best Way to Contact
+        <select name="contactMethod" required>
+          <option value="">Select...</option>
+          {db.selectableOptions.contactMethods.map((option) => (
+            <option key={option}>{option}</option>
+          ))}
+        </select>
+      </label>
+      <label>Email<input name="email" type="email" required /></label>
+      <label>Phone<input name="phone" /></label>
+      <label>Tutoring Service Type
+        <select name="serviceType" required>
+          <option value="">Select...</option>
+          {db.selectableOptions.serviceTypes.map((option) => (
+            <option key={option}>{option}</option>
+          ))}
+        </select>
+      </label>
+      <label>Subject<input name="subject" placeholder="Math / Physics / ..." /></label>
+      <label>Exam Urgency
+        <select name="urgencyWindow">
+          <option value="">Select...</option>
+          {db.selectableOptions.urgencyWindows.map((option) => (
+            <option key={option}>{option}</option>
+          ))}
+        </select>
+      </label>
+      <label>Is This Urgent?
+        <select name="isUrgent">
+          {db.selectableOptions.urgencyFlags.map((option) => (
+            <option key={option}>{option}</option>
+          ))}
+        </select>
+      </label>
+      <label>Hard Topics<textarea name="hardTopics" rows={2} /></label>
+      <label>Preferred Slot<input name="preferredSlot" type="text" placeholder="Mon/Wed 6-8PM" /></label>
+      <label>Earliest Consultation Date<input name="earliestDate" type="date" /></label>
+      <label>Message<textarea name="message" required rows={4} /></label>
+      <label className="check-row"><input name="consultation" type="checkbox" /> Request consultation session</label>
+      <label className="check-row"><input name="notRobot" type="checkbox" required /> I'm not a robot</label>
+      <button className="primary" type="submit">Submit Request</button>
+      <p className="feedback">{feedback}</p>
+    </form>
+  );
+}
+
+function RequestsPanel({
+  requests,
+  statusFilter,
+  setStatusFilter,
+  updateRequestStatus,
+  showContactDetails
+}: {
+  requests: BookingRequest[];
+  statusFilter: RequestStatusFilter;
+  setStatusFilter: (status: RequestStatusFilter) => void;
+  updateRequestStatus: (requestId: string, status: "replied" | "closed") => void;
+  showContactDetails?: boolean;
+}) {
+  return (
+    <div className="card">
+      <h3>Request Inbox</h3>
+      <label>Status Filter
+        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as RequestStatusFilter)}>
+          <option value="all">All</option>
+          <option value="new">New</option>
+          <option value="replied">Replied</option>
+          <option value="closed">Closed</option>
+        </select>
+      </label>
+
+      <div className="list">
+        {requests.length ? requests.map((request) => (
+          <div className="list-item" key={request.id}>
+            <p><strong>{request.name}</strong> | {request.serviceType} | {request.status}</p>
+            {showContactDetails ? (
+              <p className="muted">{request.email} {request.phone ? `| ${request.phone}` : ""} | {request.contactMethod}</p>
+            ) : null}
+            <p><strong>Subject:</strong> {request.subject || "Not specified"}</p>
+            <p><strong>Urgency:</strong> {request.urgencyWindow || "Not specified"} | urgent: {request.isUrgent}</p>
+            <p>{request.message}</p>
+            {request.hardTopics ? <p><strong>Hard topics:</strong> {request.hardTopics}</p> : null}
+            {request.preferredSlot ? <p><strong>Preferred slot:</strong> {request.preferredSlot}</p> : null}
+            <div className="row">
+              <button type="button" onClick={() => updateRequestStatus(request.id, "replied")}>Mark Replied</button>
+              <button type="button" onClick={() => updateRequestStatus(request.id, "closed")}>Mark Closed</button>
+            </div>
+          </div>
+        )) : (
+          <p className="muted">No requests match this filter.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function StatCard({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="card stat-card">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
   );
 }
